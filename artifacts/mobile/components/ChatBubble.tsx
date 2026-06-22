@@ -1,13 +1,14 @@
-import React, { useRef } from "react";
+import React, { memo, useRef } from "react";
 import {
   Alert,
   Animated,
-  Clipboard,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useColors } from "@/hooks/useColors";
 import { Message } from "@/contexts/ChatContext";
 
@@ -15,33 +16,41 @@ type Props = {
   message: Message;
   onDelete: (id: string) => void;
   onRegenerate?: () => void;
+  showAvatar?: boolean;
 };
 
 function formatTime(ts: number) {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return new Date(ts).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-export function ChatBubble({ message, onDelete, onRegenerate }: Props) {
+function ChatBubbleInner({ message, onDelete, onRegenerate, showAvatar = true }: Props) {
   const colors = useColors();
   const scale = useRef(new Animated.Value(1)).current;
   const isUser = message.role === "user";
 
   const handleLongPress = () => {
     Animated.sequence([
-      Animated.timing(scale, { toValue: 0.96, duration: 80, useNativeDriver: true }),
-      Animated.timing(scale, { toValue: 1, duration: 80, useNativeDriver: true }),
+      Animated.timing(scale, {
+        toValue: 0.97,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 1,
+        duration: 80,
+        useNativeDriver: true,
+      }),
     ]).start();
-
-    const options: string[] = ["Copy", "Delete"];
-    if (!isUser && onRegenerate) options.push("Regenerate");
 
     Alert.alert("Message", undefined, [
       {
         text: "Copy",
-        onPress: () => Clipboard.setString(message.content),
+        onPress: () => Clipboard.setStringAsync(message.content),
       },
-      ...((!isUser && onRegenerate)
+      ...(!isUser && onRegenerate
         ? [{ text: "Regenerate", onPress: onRegenerate }]
         : []),
       {
@@ -54,55 +63,75 @@ export function ChatBubble({ message, onDelete, onRegenerate }: Props) {
   };
 
   return (
-    <Pressable onLongPress={handleLongPress} delayLongPress={400}>
-      <Animated.View
-        style={[
-          styles.row,
-          isUser ? styles.rowUser : styles.rowAI,
-          { transform: [{ scale }] },
-        ]}
-      >
-        {!isUser && (
-          <View style={[styles.avatar, { backgroundColor: colors.coral }]}>
+    <Pressable
+      onLongPress={handleLongPress}
+      delayLongPress={380}
+      style={[styles.row, isUser ? styles.rowUser : styles.rowAI]}
+    >
+      {!isUser && (
+        <View
+          style={[
+            styles.avatar,
+            { backgroundColor: colors.coral },
+            !showAvatar && styles.avatarHidden,
+          ]}
+        >
+          {showAvatar && (
             <Text style={[styles.avatarText, { color: colors.ivory }]}>A</Text>
-          </View>
-        )}
-        <View style={styles.bubbleWrap}>
-          <View
-            style={[
-              styles.bubble,
-              isUser
-                ? [styles.bubbleUser, { backgroundColor: colors.coral }]
-                : [styles.bubbleAI, { backgroundColor: colors.card }],
-            ]}
-          >
+          )}
+        </View>
+      )}
+
+      <Animated.View
+        style={[styles.bubbleWrap, { transform: [{ scale }] }]}
+      >
+        <View
+          style={[
+            styles.bubble,
+            isUser
+              ? [styles.bubbleUser, { backgroundColor: colors.coral }]
+              : [styles.bubbleAI, { backgroundColor: colors.card, borderColor: colors.border }],
+          ]}
+        >
+          {message.content.length > 0 && (
             <Text
-              style={[
-                styles.text,
-                { color: colors.ivory },
-                message.isStreaming && styles.streaming,
-              ]}
+              style={[styles.text, { color: colors.ivory }]}
+              selectable={Platform.OS !== "web"}
             >
               {message.content}
               {message.isStreaming && (
-                <Text style={{ color: colors.sage }}>▍</Text>
+                <Text style={{ color: colors.sage }}> ▍</Text>
               )}
             </Text>
-          </View>
-          <Text style={[styles.time, { color: colors.mutedForeground }]}>
-            {formatTime(message.timestamp)}
-          </Text>
+          )}
+          {message.isStreaming && message.content.length === 0 && (
+            <Text style={{ color: colors.sage }}>▍</Text>
+          )}
         </View>
+
+        <Text
+          style={[
+            styles.time,
+            { color: colors.mutedForeground },
+            isUser ? styles.timeUser : styles.timeAI,
+          ]}
+        >
+          {formatTime(message.timestamp)}
+        </Text>
       </Animated.View>
+
+      {isUser && <View style={styles.userSpacer} />}
     </Pressable>
   );
 }
 
+export const ChatBubble = memo(ChatBubbleInner);
+
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    marginHorizontal: 16,
-    marginVertical: 3,
+    marginHorizontal: 12,
+    marginVertical: 2,
     alignItems: "flex-end",
     gap: 8,
   },
@@ -113,20 +142,23 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    flexShrink: 0,
+    marginBottom: 18,
+  },
+  avatarHidden: {
+    backgroundColor: "transparent",
   },
   avatarText: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12,
     fontFamily: "PlayfairDisplay_700Bold",
   },
   bubbleWrap: {
-    maxWidth: "75%",
+    maxWidth: "78%",
   },
   bubble: {
     paddingHorizontal: 14,
@@ -134,23 +166,31 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   bubbleUser: {
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 5,
   },
   bubbleAI: {
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 5,
+    borderWidth: 1,
   },
   text: {
     fontSize: 15,
     lineHeight: 22,
     fontFamily: "Inter_400Regular",
   },
-  streaming: {
-    opacity: 0.9,
-  },
   time: {
     fontSize: 11,
-    marginTop: 3,
-    marginHorizontal: 4,
+    marginTop: 4,
     fontFamily: "Inter_400Regular",
+  },
+  timeUser: {
+    textAlign: "right",
+    marginRight: 4,
+  },
+  timeAI: {
+    textAlign: "left",
+    marginLeft: 4,
+  },
+  userSpacer: {
+    width: 0,
   },
 });

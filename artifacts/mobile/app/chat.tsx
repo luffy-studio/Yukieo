@@ -1,8 +1,15 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-  FlatList,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -12,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Feather } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { useChat, Message } from "@/contexts/ChatContext";
+import { useChat } from "@/contexts/ChatContext";
 import { ChatBubble } from "@/components/ChatBubble";
 import { ChatInput } from "@/components/ChatInput";
 import { TypingIndicator } from "@/components/TypingIndicator";
@@ -24,38 +31,92 @@ const EMPTY_PROMPTS = [
   "Start a conversation.",
 ];
 
+const EmptyState = memo(function EmptyState({
+  prompt,
+  colors,
+}: {
+  prompt: string;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={styles.emptyState}>
+      <View style={[styles.emptyOrb, { backgroundColor: colors.coral + "22" }]}>
+        <Text style={[styles.emptyOrbText, { color: colors.coral }]}>A</Text>
+      </View>
+      <Text style={[styles.emptyName, { color: colors.ivory }]}>Aria</Text>
+      <Text style={[styles.emptyPrompt, { color: colors.mutedForeground }]}>
+        {prompt}
+      </Text>
+    </View>
+  );
+});
+
 export default function ChatScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { messages, isTyping, sendMessage, deleteMessage, regenerateResponse } = useChat();
-  const flatListRef = useRef<FlatList<Message>>(null);
+  const {
+    messages,
+    isTyping,
+    isSending,
+    sendMessage,
+    deleteMessage,
+    regenerateResponse,
+  } = useChat();
+
+  const scrollRef = useRef<ScrollView>(null);
+  const atBottomRef = useRef(true);
   const [prompt] = useState(
     () => EMPTY_PROMPTS[Math.floor(Math.random() * EMPTY_PROMPTS.length)]
   );
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
+  const scrollToBottom = useCallback((animated = true) => {
+    scrollRef.current?.scrollToEnd({ animated });
+  }, []);
+
+  useEffect(() => {
+    if (atBottomRef.current) {
+      const id = setTimeout(() => scrollToBottom(true), 60);
+      return () => clearTimeout(id);
+    }
+  }, [messages, isTyping, scrollToBottom]);
+
+  const handleScroll = useCallback((e: { nativeEvent: { contentOffset: { y: number }; contentSize: { height: number }; layoutMeasurement: { height: number } } }) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const distFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+    atBottomRef.current = distFromBottom < 80;
+  }, []);
+
   const handleSend = useCallback(
     (text: string) => {
+      atBottomRef.current = true;
       sendMessage(text);
     },
     [sendMessage]
   );
 
-  const renderItem = useCallback(
-    ({ item }: { item: Message }) => (
-      <ChatBubble
-        message={item}
-        onDelete={deleteMessage}
-        onRegenerate={item.role === "assistant" ? regenerateResponse : undefined}
-      />
-    ),
-    [deleteMessage, regenerateResponse]
-  );
+  const isEmpty = messages.length === 0 && !isTyping;
 
-  const keyExtractor = useCallback((item: Message) => item.id, []);
-
-  const ListHeaderComponent = isTyping ? <TypingIndicator /> : null;
+  const messageNodes = useMemo(() => {
+    return messages.map((msg, i) => {
+      const prev = messages[i - 1];
+      const showAvatar =
+        msg.role === "assistant" &&
+        (!prev || prev.role !== "assistant");
+      return (
+        <ChatBubble
+          key={msg.id}
+          message={msg}
+          showAvatar={showAvatar}
+          onDelete={deleteMessage}
+          onRegenerate={
+            msg.role === "assistant" ? regenerateResponse : undefined
+          }
+        />
+      );
+    });
+  }, [messages, deleteMessage, regenerateResponse]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primaryBg }]}>
@@ -71,19 +132,30 @@ export default function ChatScreen() {
       >
         <View style={styles.headerLeft}>
           <View style={[styles.avatarBig, { backgroundColor: colors.coral }]}>
-            <Text style={[styles.avatarBigText, { color: colors.ivory }]}>A</Text>
+            <Text style={[styles.avatarBigText, { color: colors.ivory }]}>
+              A
+            </Text>
           </View>
           <View>
-            <Text style={[styles.headerName, { color: colors.ivory }]}>Aria</Text>
+            <Text style={[styles.headerName, { color: colors.ivory }]}>
+              Aria
+            </Text>
             <View style={styles.onlineRow}>
-              <View style={[styles.onlineDot, { backgroundColor: "#4CAF50" }]} />
-              <Text style={[styles.onlineText, { color: colors.sage }]}>Online</Text>
+              <View
+                style={[styles.onlineDot, { backgroundColor: "#4CAF50" }]}
+              />
+              <Text style={[styles.statusText, { color: colors.sage }]}>
+                {isTyping ? "typing..." : "online"}
+              </Text>
             </View>
           </View>
         </View>
         <Pressable
           onPress={() => router.push("/settings")}
-          style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.6 : 1 }]}
+          style={({ pressed }) => [
+            styles.headerBtn,
+            { opacity: pressed ? 0.6 : 1 },
+          ]}
         >
           <Feather name="more-vertical" size={22} color={colors.ivory} />
         </Pressable>
@@ -94,44 +166,39 @@ export default function ChatScreen() {
         behavior="padding"
         keyboardVerticalOffset={0}
       >
-        {messages.length === 0 && !isTyping ? (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptyOrb, { backgroundColor: colors.coral + "20" }]}>
-              <Text style={[styles.emptyOrbText, { color: colors.coral }]}>A</Text>
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.ivory }]}>Aria</Text>
-            <Text style={[styles.emptyPrompt, { color: colors.mutedForeground }]}>
-              {prompt}
-            </Text>
+        {isEmpty ? (
+          <View style={styles.flex}>
+            <EmptyState prompt={prompt} colors={colors} />
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderItem}
-            keyExtractor={keyExtractor}
-            inverted
+          <ScrollView
+            ref={scrollRef}
+            style={styles.flex}
             contentContainerStyle={styles.listContent}
+            onScroll={handleScroll}
+            scrollEventThrottle={100}
             keyboardDismissMode="interactive"
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={ListHeaderComponent}
-          />
+            onContentSizeChange={() => {
+              if (atBottomRef.current) scrollToBottom(false);
+            }}
+          >
+            {messageNodes}
+            {isTyping && <TypingIndicator />}
+            <View style={styles.listBottom} />
+          </ScrollView>
         )}
 
-        <ChatInput onSend={handleSend} disabled={isTyping} />
+        <ChatInput onSend={handleSend} disabled={isSending} />
       </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  flex: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  flex: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -171,21 +238,25 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
   },
-  onlineText: {
+  statusText: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
   headerBtn: {
-    padding: 4,
+    padding: 8,
   },
   listContent: {
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  listBottom: {
+    height: 4,
   },
   emptyState: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
+    gap: 10,
     paddingHorizontal: 40,
   },
   emptyOrb: {
@@ -200,7 +271,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontFamily: "PlayfairDisplay_700Bold",
   },
-  emptyTitle: {
+  emptyName: {
     fontSize: 22,
     fontFamily: "PlayfairDisplay_700Bold",
   },

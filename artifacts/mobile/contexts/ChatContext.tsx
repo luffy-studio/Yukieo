@@ -19,9 +19,10 @@ export type Message = {
 type ChatContextType = {
   messages: Message[];
   isTyping: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  isSending: boolean;
+  sendMessage: (text: string) => void;
   deleteMessage: (id: string) => void;
-  regenerateResponse: () => Promise<void>;
+  regenerateResponse: () => void;
   clearHistory: () => Promise<void>;
   exportChats: () => string;
 };
@@ -31,10 +32,10 @@ const ChatContext = createContext<ChatContextType | null>(null);
 const STORAGE_KEY = "chat_history";
 
 function makeId() {
-  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-const PERSONALITY_RESPONSES: Record<string, string[]> = {
+const PERSONALITY: Record<string, string[]> = {
   greeting: [
     "Hey 👋",
     "Hey! Good to see you.",
@@ -74,6 +75,12 @@ const PERSONALITY_RESPONSES: Record<string, string[]> = {
     "Let's fix that. What's something you've been curious about lately?",
     "Same, honestly. Want to talk about something random?",
   ],
+  question: [
+    "That's a great question — I'm not totally sure, honestly.",
+    "Hmm, I'd have to think about that more. What's your take?",
+    "Good question. What made you think of that?",
+    "I've wondered that myself. What do you think?",
+  ],
   default: [
     "Interesting. Tell me more?",
     "I hadn't thought about it that way.",
@@ -88,191 +95,225 @@ const PERSONALITY_RESPONSES: Record<string, string[]> = {
   ],
 };
 
-function detectIntent(text: string): string {
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function buildResponse(text: string): string {
   const lower = text.toLowerCase().trim();
-  if (/^(hi|hey|hello|hiya|sup|what's up|yo)\b/.test(lower)) return "greeting";
-  if (/how are you|how's it going|how do you feel|you okay/.test(lower)) return "howAreYou";
-  if (/what are you doing|what('re| are) you up to/.test(lower)) return "whatAreYouDoing";
-  if (/\b(sad|depressed|anxious|stressed|lonely|upset|angry|frustrated|scared|worried)\b/.test(lower)) return "feelings";
-  if (/\b(thanks|thank you|thx|ty)\b/.test(lower)) return "thanks";
-  if (/\b(bored|boring|nothing to do)\b/.test(lower)) return "bored";
-  return "default";
-}
-
-function buildContextualResponse(
-  userText: string,
-  history: Message[]
-): string {
-  const intent = detectIntent(userText);
-  const pool = PERSONALITY_RESPONSES[intent] ?? PERSONALITY_RESPONSES.default;
-  const pick = pool[Math.floor(Math.random() * pool.length)];
-
-  if (intent === "default" && userText.trim().endsWith("?")) {
-    const extras = [
-      "That's a great question — I'm not totally sure, honestly.",
-      "Hmm, I'd have to think about that more. What's your take?",
-      "Good question. What made you think of that?",
-      "I've wondered that myself. What do you think?",
-    ];
-    return extras[Math.floor(Math.random() * extras.length)];
-  }
-
-  return pick;
-}
-
-async function simulateStream(
-  fullResponse: string,
-  onChunk: (chunk: string) => void,
-  onDone: () => void
-) {
-  const words = fullResponse.split(" ");
-  const baseDelay = 40 + Math.random() * 30;
-  let built = "";
-
-  for (let i = 0; i < words.length; i++) {
-    await new Promise((r) => setTimeout(r, baseDelay + Math.random() * 20));
-    built += (i === 0 ? "" : " ") + words[i];
-    onChunk(built);
-  }
-  onDone();
+  if (/^(hi|hey|hello|hiya|sup|yo)\b/.test(lower)) return pick(PERSONALITY.greeting);
+  if (/how are you|how'?s? it going|you okay/.test(lower)) return pick(PERSONALITY.howAreYou);
+  if (/what are you doing|what'?r?e? you up to/.test(lower)) return pick(PERSONALITY.whatAreYouDoing);
+  if (/\b(sad|depressed|anxious|stressed|lonely|upset|angry|frustrated|scared|worried)\b/.test(lower)) return pick(PERSONALITY.feelings);
+  if (/\b(thanks|thank you|thx|ty)\b/.test(lower)) return pick(PERSONALITY.thanks);
+  if (/\b(bored|boring|nothing to do)\b/.test(lower)) return pick(PERSONALITY.bored);
+  if (lower.trim().endsWith("?")) return pick(PERSONALITY.question);
+  return pick(PERSONALITY.default);
 }
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
-  const lastUserMessageRef = useRef<string>("");
+  const [isSending, setIsSending] = useState(false);
+
+  const messagesRef = useRef<Message[]>([]);
+  const abortRef = useRef<(() => void) | null>(null);
+  const lastUserTextRef = useRef("");
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as Message[];
-          setMessages(parsed);
-        } catch {}
-      }
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as Message[];
+        messagesRef.current = parsed;
+        setMessages(parsed);
+      } catch {}
     });
   }, []);
 
-  const saveMessages = useCallback((msgs: Message[]) => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
+  const persist = useCallback((msgs: Message[]) => {
+    const clean = msgs.map((m) =>
+      m.isStreaming ? { ...m, isStreaming: false } : m
+    );
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
   }, []);
 
-  const sendAIResponse = useCallback(
-    async (userText: string, currentMessages: Message[]) => {
-      const thinkDelay = 600 + Math.random() * 800;
-      setIsTyping(true);
-      await new Promise((r) => setTimeout(r, thinkDelay));
-      setIsTyping(false);
+  const applyMessages = useCallback(
+    (updater: (prev: Message[]) => Message[]) => {
+      setMessages((prev) => {
+        const next = updater(prev);
+        messagesRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
 
-      const response = buildContextualResponse(userText, currentMessages);
-      const assistantId = makeId();
-
-      const streamingMsg: Message = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        timestamp: Date.now(),
-        isStreaming: true,
+  const streamResponse = useCallback(
+    async (responseText: string, assistantId: string): Promise<void> => {
+      const words = responseText.split(" ");
+      let aborted = false;
+      abortRef.current = () => {
+        aborted = true;
       };
 
-      setMessages((prev) => {
-        const updated = [...prev, streamingMsg];
-        return updated;
-      });
+      const delay = () =>
+        new Promise<void>((r) => setTimeout(r, 40 + Math.random() * 25));
 
-      await simulateStream(
-        response,
-        (chunk) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantId ? { ...m, content: chunk } : m
-            )
-          );
-        },
-        () => {
-          setMessages((prev) => {
-            const done = prev.map((m) =>
-              m.id === assistantId ? { ...m, isStreaming: false } : m
-            );
-            saveMessages(done);
-            return done;
-          });
-        }
-      );
+      let built = "";
+      for (let i = 0; i < words.length; i++) {
+        if (aborted) return;
+        await delay();
+        if (aborted) return;
+        built += (i === 0 ? "" : " ") + words[i];
+        const snapshot = built;
+        applyMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: snapshot } : m
+          )
+        );
+      }
+
+      abortRef.current = null;
+      applyMessages((prev) => {
+        const done = prev.map((m) =>
+          m.id === assistantId ? { ...m, isStreaming: false } : m
+        );
+        persist(done);
+        return done;
+      });
     },
-    [saveMessages]
+    [applyMessages, persist]
+  );
+
+  const runAITurn = useCallback(
+    async (userText: string) => {
+      if (abortRef.current) {
+        abortRef.current();
+        abortRef.current = null;
+      }
+
+      const thinkMs = 600 + Math.random() * 700;
+      setIsTyping(true);
+      await new Promise((r) => setTimeout(r, thinkMs));
+      setIsTyping(false);
+
+      const response = buildResponse(userText);
+      const assistantId = makeId();
+
+      applyMessages((prev) => [
+        ...prev,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          timestamp: Date.now(),
+          isStreaming: true,
+        },
+      ]);
+
+      await streamResponse(response, assistantId);
+      setIsSending(false);
+    },
+    [applyMessages, streamResponse]
   );
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed) return;
+      if (!trimmed || isSending) return;
 
-      lastUserMessageRef.current = trimmed;
+      lastUserTextRef.current = trimmed;
+      setIsSending(true);
 
-      const userMsg: Message = {
-        id: makeId(),
-        role: "user",
-        content: trimmed,
-        timestamp: Date.now(),
-      };
+      applyMessages((prev) => {
+        const updated = [
+          ...prev,
+          {
+            id: makeId(),
+            role: "user" as const,
+            content: trimmed,
+            timestamp: Date.now(),
+          },
+        ];
+        persist(updated);
+        return updated;
+      });
 
-      const updatedMessages = [...messages, userMsg];
-      setMessages(updatedMessages);
-      saveMessages(updatedMessages);
-
-      await sendAIResponse(trimmed, updatedMessages);
+      runAITurn(trimmed);
     },
-    [messages, saveMessages, sendAIResponse]
+    [isSending, applyMessages, persist, runAITurn]
   );
 
   const deleteMessage = useCallback(
     (id: string) => {
-      setMessages((prev) => {
+      applyMessages((prev) => {
         const updated = prev.filter((m) => m.id !== id);
-        saveMessages(updated);
+        persist(updated);
         return updated;
       });
     },
-    [saveMessages]
+    [applyMessages, persist]
   );
 
-  const regenerateResponse = useCallback(async () => {
-    setMessages((prev) => {
-      const withoutLast =
-        prev[prev.length - 1]?.role === "assistant"
-          ? prev.slice(0, -1)
-          : prev;
-      saveMessages(withoutLast);
+  const regenerateResponse = useCallback(() => {
+    if (isSending) return;
+
+    if (abortRef.current) {
+      abortRef.current();
+      abortRef.current = null;
+    }
+
+    const current = messagesRef.current;
+    const withoutLast =
+      current[current.length - 1]?.role === "assistant"
+        ? current.slice(0, -1)
+        : current;
+
+    setIsSending(true);
+    setIsTyping(false);
+    applyMessages(() => {
+      persist(withoutLast);
       return withoutLast;
     });
-    await new Promise((r) => setTimeout(r, 100));
-    if (lastUserMessageRef.current) {
-      await sendAIResponse(lastUserMessageRef.current, messages.slice(0, -1));
+
+    const lastUserMsg = lastUserTextRef.current;
+    if (lastUserMsg) {
+      runAITurn(lastUserMsg);
+    } else {
+      setIsSending(false);
     }
-  }, [messages, saveMessages, sendAIResponse]);
+  }, [isSending, applyMessages, persist, runAITurn]);
 
   const clearHistory = useCallback(async () => {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+    if (abortRef.current) {
+      abortRef.current();
+      abortRef.current = null;
+    }
+    setIsTyping(false);
+    setIsSending(false);
+    messagesRef.current = [];
     setMessages([]);
+    await AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const exportChats = useCallback(() => {
-    return messages
+  const exportChats = useCallback((): string => {
+    return messagesRef.current
       .map(
         (m) =>
           `[${new Date(m.timestamp).toLocaleString()}] ${
-            m.role === "user" ? "You" : "AI"
+            m.role === "user" ? "You" : "Aria"
           }: ${m.content}`
       )
       .join("\n");
-  }, [messages]);
+  }, []);
 
   return (
     <ChatContext.Provider
       value={{
         messages,
         isTyping,
+        isSending,
         sendMessage,
         deleteMessage,
         regenerateResponse,

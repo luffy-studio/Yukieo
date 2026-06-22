@@ -1,0 +1,140 @@
+You are a Principal Android Architect, Kotlin Expert, Jetpack Compose Expert, and AI Infrastructure Engineer.
+
+Audit and completely redesign the chat architecture, message rendering system, model state management system, and AI lifecycle management.
+
+Current Problems:
+
+1. Chat UI looks broken and unprofessional.
+
+2. Message bubbles are inconsistent.
+
+3. User and AI messages are poorly differentiated.
+
+4. Timestamps are misaligned.
+
+5. Message spacing is inconsistent.
+
+6. Scrolling behavior is unreliable.
+
+7. AI responses do not appear smoothly.
+
+8. Typing animations are missing or unstable.
+
+9. Model status flickers between:
+
+   * Installed
+   * Not Installed
+   * Downloading
+   * Ready
+
+10. Model state changes unexpectedly after startup.
+
+11. UI displays incorrect model status.
+
+12. Model state is not persistent across recompositions.
+
+13. Model verification runs multiple times.
+
+14. Multiple state emitters are conflicting.
+
+15. Race conditions exist between:
+
+    * ViewModel
+    * WorkManager
+    * ModelManager
+    * Repository
+    * Compose UI
+
+Tasks:
+
+CHAT UI REBUILD
+
+* Recreate the entire chat screen.
+* Use a premium ChatGPT/Claude style interface.
+* Smooth scrolling.
+* Stable LazyColumn implementation.
+* Proper message grouping.
+* Modern chat bubbles.
+* Dynamic bubble sizing.
+* Long message support.
+* Markdown support.
+* Code block support.
+* Message copy support.
+* Message regeneration support.
+* Streaming response support.
+* Typing indicator.
+* Auto-scroll only when user is near bottom.
+* Proper keyboard handling.
+* Proper IME handling.
+* No layout jumps.
+* No recomposition flickering.
+
+MODEL STATE FIX
+
+Create a single source of truth.
+
+Only one component should control model state.
+
+Implement:
+
+sealed class ModelState {
+object NotInstalled
+object Downloading
+data class Progress(val percent: Int)
+object Verifying
+object Installed
+object Loading
+object Ready
+data class Error(val message: String)
+}
+
+Requirements:
+
+* Eliminate duplicate state emitters.
+* Eliminate race conditions.
+* Eliminate state resets.
+* Eliminate startup flickering.
+* Persist state across process death.
+* Persist state across configuration changes.
+* Persist state across app restarts.
+
+Model Verification Rules:
+
+1. Verify model file exists.
+2. Verify file size.
+3. Verify checksum.
+4. Verify model compatibility.
+5. Emit Installed only after verification succeeds.
+6. Never emit NotInstalled after Installed unless file is actually missing.
+7. Never overwrite a valid state with stale state.
+
+ViewModel Requirements:
+
+* Use StateFlow.
+* Use immutable UI state.
+* Use collectAsStateWithLifecycle.
+* Use proper coroutine scope handling.
+* Prevent duplicate collectors.
+* Prevent duplicate downloads.
+* Prevent duplicate verification jobs.
+
+Performance Requirements:
+
+* Zero unnecessary recompositions.
+* Zero UI flickering.
+* Zero status flickering.
+* Zero duplicate network requests.
+* Zero duplicate model checks.
+
+Output:
+
+1. Find every root cause.
+2. Explain every bug.
+3. Provide corrected code.
+4. Provide optimized architecture.
+5. Rewrite affected files completely.
+6. Verify all code compiles.
+7. Verify all state transitions are stable.
+8. Verify chat UI behaves like a production AI application.
+9. Verify model status remains accurate at all times.
+10. Ensure the final application feels as polished as ChatGPT, Claude, or Gemini.

@@ -1,0 +1,398 @@
+You are a Principal Android Engineer, AI Systems Architect, Product Designer, UX Researcher, and Mobile Performance Expert.
+
+Your mission is to build a complete production-ready Android AI Companion application.
+
+Before writing a single line of code:
+
+* Analyze the entire project.
+* Understand every screen.
+* Understand every dependency.
+* Understand the navigation flow.
+* Understand the current architecture.
+* Preserve existing functionality wherever possible.
+
+Do NOT rebuild the project unless absolutely necessary.
+
+─────────────────────────────
+
+PROJECT VISION
+
+Create a luxury AI companion application that feels like a combination of:
+
+* ChatGPT
+* Character AI
+* IRA AI
+* WhatsApp
+* iMessage
+* Raycast
+* Notion
+* Apple Design
+
+The app should feel emotional, intelligent, premium, elegant and human.
+
+The goal is that users forget they are talking to software.
+
+─────────────────────────────
+
+CORE PRINCIPLES
+
+1. Offline First
+2. Privacy First
+3. Human First
+4. Fast First
+5. Mobile First
+6. Luxury Design First
+
+─────────────────────────────
+
+AUTHENTICATION
+
+Remove completely:
+
+* Login
+* Signup
+* Registration
+* OTP
+* Email Verification
+* Password Reset
+* Session Management
+
+User should install app and immediately start chatting.
+
+No onboarding friction.
+
+─────────────────────────────
+
+AI SYSTEM
+
+Everything must run locally.
+
+No:
+
+* OpenAI API
+* Gemini API
+* Claude API
+* Firebase AI
+* Backend Server
+* Node.js Server
+* Render
+* Vercel
+* Supabase Auth
+* Cloud Inference
+* Localhost Requests
+
+No internet required after installation.
+
+─────────────────────────────
+
+LOCAL MODEL
+
+Preferred Model:
+
+Qwen 2.5 1.5B Instruct
+
+Fallback:
+
+* Phi-3 Mini
+* Gemma 2B
+* TinyLlama
+
+Use:
+
+* GGUF
+* llama.cpp Android
+  or
+* MLC-LLM
+
+The model must run directly on device.
+
+─────────────────────────────
+
+FIRST APP LAUNCH
+
+User opens app.
+
+If model not installed:
+
+Show premium setup screen.
+
+Text:
+
+"Preparing Your AI Companion"
+
+Then:
+
+* Download Model
+* Verify Files
+* Install Model
+* Optimize Device
+* Ready
+
+Show:
+
+* Percentage
+* ETA
+* Download Speed
+* Downloaded Size
+* Remaining Size
+
+Support:
+
+* Pause
+* Resume
+* Retry
+
+After installation:
+
+Automatically open chat.
+
+─────────────────────────────
+
+AI PERSONALITY
+
+The AI must behave like a real human.
+
+Never sound robotic.
+
+Never constantly say:
+
+"As an AI..."
+
+Never overexplain.
+
+Never generate essays unless asked.
+
+Conversation style:
+
+* Casual
+* Friendly
+* Emotional
+* Smart
+* Context Aware
+
+Examples:
+
+User:
+Hi
+
+AI:
+Hey 👋
+
+User:
+What are you doing?
+
+AI:
+Just hanging out here 😄
+
+User:
+How was your day?
+
+AI:
+Pretty good so far. Yours?
+
+Responses should feel natural.
+
+─────────────────────────────
+
+CHAT EXPERIENCE
+
+Inspired by:
+
+* WhatsApp
+* iMessage
+* Telegram
+
+Requirements:
+
+* Streaming text
+* Typing animation
+* Readable bubbles
+* Smooth scrolling
+* Swipe gestures
+* Long press actions
+* Copy message
+* Delete message
+* Regenerate response
+
+─────────────────────────────
+
+MEMORY
+
+Store locally.
+
+Remember:
+
+* Previous chats
+* User preferences
+* Conversation history
+
+No cloud storage.
+
+─────────────────────────────
+
+DESIGN SYSTEM
+
+Theme:
+
+Luxury Dark Mode
+
+Palette:
+
+Coral:
+#702826
+
+Ivory:
+#EFE9D7
+
+Sage:
+#898861
+
+Juniper:
+#343723
+
+Primary Background:
+#0F1110
+
+Secondary Background:
+#171A18
+
+Card:
+#1D211E
+
+Text:
+#EFE9D7
+
+Accent:
+#702826
+
+The UI should feel expensive and premium.
+
+─────────────────────────────
+
+TYPOGRAPHY
+
+Use Serif Typography.
+
+Preferred:
+
+* Cormorant Garamond
+* Playfair Display
+* Libre Baskerville
+
+Headings:
+Elegant Serif
+
+Body:
+Clean readable font
+
+Typography should feel luxury.
+
+─────────────────────────────
+
+ANIMATIONS
+
+Use:
+
+* Framer Motion equivalent
+* Spring animations
+* Smooth transitions
+* Premium micro-interactions
+
+Avoid flashy effects.
+
+Everything should feel calm and expensive.
+
+─────────────────────────────
+
+SETTINGS PAGE
+
+Include:
+
+AI Model
+
+Model Status
+
+Storage Usage
+
+Installed Version
+
+Download Progress
+
+Switch Model
+
+Delete Model
+
+Clear Cache
+
+Export Chats
+
+Import Chats
+
+Theme Controls
+
+About Device
+
+─────────────────────────────
+
+PERFORMANCE
+
+Target:
+
+RAM < 2GB
+
+APK < 300MB
+
+Cold Start < 5 sec
+
+Response Time < 3 sec
+
+60 FPS UI
+
+Battery Efficient
+
+Low Storage Usage
+
+─────────────────────────────
+
+DELIVERABLES
+
+1. Architecture Review
+2. Existing Code Analysis
+3. Local AI Integration
+4. Offline Runtime Setup
+5. Download Manager
+6. Settings Implementation
+7. Human Personality System
+8. Memory System
+9. UI Components
+10. Exact File Changes
+11. Testing Plan
+12. Production Build Configuration
+
+SUCCESS CRITERIA
+
+✓ No Login
+
+✓ No Internet Required
+
+✓ Fully Offline AI
+
+✓ Human-like Conversations
+
+✓ Luxury Dark Theme
+
+✓ Serif Typography
+
+✓ WhatsApp-style Chat
+
+✓ Local Memory
+
+✓ Smooth Animations
+
+✓ Production Ready APK
+
+✓ Existing UI Preserved
+
+FINAL OBJECTIVE
+
+Build the most premium, human-like, privacy-focused offline AI companion possible for Android that feels less like an app and more like a real person living inside the phone.
